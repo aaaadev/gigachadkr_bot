@@ -1,1 +1,3 @@
-# gigachadkr_bot
+# 기가채드봇
+## License
+본 소프트웨어는 MIT 라이센스로 배포됨.

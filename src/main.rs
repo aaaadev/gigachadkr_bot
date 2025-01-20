@@ -7,10 +7,14 @@ use openai::{
 use std::error::Error;
 
 use teloxide::{
-    dispatching::dialogue::GetChatId, payloads::SendMessageSetters, prelude::*, types::{
+    dispatching::dialogue::GetChatId,
+    payloads::SendMessageSetters,
+    prelude::*,
+    types::{
         InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputMessageContent,
         InputMessageContentText, Me, ReplyParameters,
-    }, utils::command::BotCommands
+    },
+    utils::command::BotCommands,
 };
 
 mod db;
@@ -122,10 +126,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().unwrap();
     let bot = Bot::from_env();
 
-    let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(message_handler));
+    let handler = dptree::entry().branch(Update::filter_message().endpoint(message_handler));
 
-    Dispatcher::builder(bot, handler).enable_ctrlc_handler().build().dispatch().await;
+    Dispatcher::builder(bot, handler)
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
     Ok(())
 }
 
@@ -143,73 +150,105 @@ async fn message_handler(
             content: Some(PROMPT.to_string()),
             ..Default::default()
         });
-        db::push_converstaion(msg.chat.id, ChatCompletionMessage {
-            role: ChatCompletionMessageRole::System,
-            content: Some(PROMPT.to_string()),
-            ..Default::default()
-        }).unwrap();
+        db::push_converstaion(
+            msg.chat.id,
+            ChatCompletionMessage {
+                role: ChatCompletionMessageRole::System,
+                content: Some(PROMPT.to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
     } else {
         messages.extend_from_slice(&mut data.messages);
     }
 
     if let Some(text) = msg.text() {
-        bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing).await?;
+        bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing)
+            .await?;
         match BotCommands::parse(text, me.username()) {
             Ok(Command::Help) => {
-                bot.send_message(msg.chat.id, Command::descriptions().to_string()).reply_parameters(ReplyParameters::new(msg.id)).await?;
-            },
-        Ok(Command::Start) => {
-            messages.push(ChatCompletionMessage {
-                role: ChatCompletionMessageRole::User,
-                content: Some(format!("[{}] 안녕", msg.from.unwrap().full_name())),
-                ..Default::default()
-            });
-            db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
-            let chat_completion = ChatCompletion::builder("gpt-4o", messages.clone())
-            .credentials(credentials.clone())
-            .create()
-            .await
-            .unwrap();
-            let returned_message = chat_completion.choices.first().unwrap().message.clone();
+                bot.send_message(msg.chat.id, Command::descriptions().to_string())
+                    .reply_parameters(ReplyParameters::new(msg.id))
+                    .await?;
+            }
+            Ok(Command::Start) => {
+                messages.push(ChatCompletionMessage {
+                    role: ChatCompletionMessageRole::User,
+                    content: Some(format!("[{}] 안녕", msg.from.unwrap().full_name())),
+                    ..Default::default()
+                });
+                db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
+                if let Ok(chat_completion) = ChatCompletion::builder("gpt-4o", messages.clone())
+                    .credentials(credentials.clone())
+                    .create()
+                    .await
+                {
+                    let returned_message = chat_completion.choices.first().unwrap().message.clone();
 
-            messages.push(returned_message.clone());
-            db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
-            bot.send_message(msg.chat.id, format!("{}", &returned_message.content.clone().unwrap().trim())).reply_parameters(ReplyParameters::new(msg.id)).await?;
-        },
-        Ok(Command::Bye) => {
-            messages.push(ChatCompletionMessage {
-                role: ChatCompletionMessageRole::User,
-                content: Some(format!("[{}] 너와의 대화 내역을 잊어줘", msg.from.unwrap().full_name())),
-                ..Default::default()
-            });
-            let chat_completion = ChatCompletion::builder("gpt-4o", messages.clone())
-            .credentials(credentials.clone())
-            .create()
-            .await
-            .unwrap();
-            let returned_message = chat_completion.choices.first().unwrap().message.clone();
+                    messages.push(returned_message.clone());
+                    db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{}", &returned_message.content.clone().unwrap().trim()),
+                    )
+                    .reply_parameters(ReplyParameters::new(msg.id))
+                    .await?;
+                }
+            }
+            Ok(Command::Bye) => {
+                messages.push(ChatCompletionMessage {
+                    role: ChatCompletionMessageRole::User,
+                    content: Some(format!(
+                        "[{}] 너와의 대화 내역을 잊어줘",
+                        msg.from.unwrap().full_name()
+                    )),
+                    ..Default::default()
+                });
+                if let Ok(chat_completion) = ChatCompletion::builder("gpt-4o", messages.clone())
+                    .credentials(credentials.clone())
+                    .create()
+                    .await
+                {
+                    let returned_message = chat_completion.choices.first().unwrap().message.clone();
 
-            db::reset_converstaion(msg.chat.id).unwrap();
-            bot.send_message(msg.chat.id, format!("{}", &returned_message.content.clone().unwrap().trim())).reply_parameters(ReplyParameters::new(msg.id)).await?;
-        },
-        Err(_) => {
-            messages.push(ChatCompletionMessage {
-                role: ChatCompletionMessageRole::User,
-                content: Some(format!("[{}] {}", msg.clone().from.unwrap().full_name(), msg.text().unwrap_or_default())),
-                ..Default::default()
-            });
-            db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
-            let chat_completion = ChatCompletion::builder("gpt-4o", messages.clone())
-            .credentials(credentials.clone())
-            .create()
-            .await
-            .unwrap();
-            let returned_message = chat_completion.choices.first().unwrap().message.clone();
+                    db::reset_converstaion(msg.chat.id).unwrap();
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{}", &returned_message.content.clone().unwrap().trim()),
+                    )
+                    .reply_parameters(ReplyParameters::new(msg.id))
+                    .await?;
+                }
+            }
+            Err(_) => {
+                messages.push(ChatCompletionMessage {
+                    role: ChatCompletionMessageRole::User,
+                    content: Some(format!(
+                        "[{}] {}",
+                        msg.clone().from.unwrap().full_name(),
+                        msg.text().unwrap_or_default()
+                    )),
+                    ..Default::default()
+                });
+                db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
+                if let Ok(chat_completion) = ChatCompletion::builder("gpt-4o", messages.clone())
+                    .credentials(credentials.clone())
+                    .create()
+                    .await
+                {
+                    let returned_message = chat_completion.choices.first().unwrap().message.clone();
 
-            messages.push(returned_message.clone());
-            db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
-            bot.send_message(msg.chat.id, format!("{}", &returned_message.content.clone().unwrap().trim())).reply_parameters(ReplyParameters::new(msg.id)).await?;
-        }
+                    messages.push(returned_message.clone());
+                    db::push_converstaion(msg.chat.id, messages.last().unwrap().clone()).unwrap();
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{}", &returned_message.content.clone().unwrap().trim()),
+                    )
+                    .reply_parameters(ReplyParameters::new(msg.id))
+                    .await?;
+                }
+            }
         }
     }
 
@@ -217,7 +256,10 @@ async fn message_handler(
 }
 
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "이 커맨드들이 지원된다고, 만삣삐:")]
+#[command(
+    rename_rule = "lowercase",
+    description = "이 커맨드들이 지원된다고, 만삣삐:"
+)]
 enum Command {
     #[command(description = "이 봇을 사용하기 위한 도움말을 표시해.")]
     Help,

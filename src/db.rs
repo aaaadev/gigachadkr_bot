@@ -1,12 +1,12 @@
-use std::fs::{self, OpenOptions};
-use std::io::{Read, Result, Write};
-use std::os::unix::fs::FileExt;
-use teloxide::prelude::*;
 use openai::{
     chat::{ChatCompletion, ChatCompletionMessage, ChatCompletionMessageRole},
     Credentials,
 };
 use serde::{Deserialize, Serialize};
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Result, Write};
+use std::os::unix::fs::FileExt;
+use teloxide::prelude::*;
 
 #[derive(Clone, Deserialize, Serialize, Default)]
 pub struct Data {
@@ -25,10 +25,10 @@ pub fn push_converstaion(chat_id: ChatId, chat: ChatCompletionMessage) -> Result
     let file_name = format!("conversations/{}", chat_id.0);
     check_dir()?;
     let mut f = OpenOptions::new()
-    .read(true)
-    .write(true)
-    .create(true)
-    .open(file_name)?;
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(file_name)?;
     let mut buf = String::new();
     f.read_to_string(&mut buf)?;
     let mut data: Data = serde_json::from_str(&buf).unwrap_or_default();
@@ -49,10 +49,11 @@ pub fn get_data(chat_id: ChatId) -> Result<Data> {
     let file_name = format!("conversations/{}", chat_id.0);
     check_dir().unwrap();
     let mut f = OpenOptions::new()
-    .read(true)
-    .write(true)
-    .create(true)
-    .open(file_name).unwrap();
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(file_name)
+        .unwrap();
     let mut buf = String::new();
     f.read_to_string(&mut buf)?;
     let data: Data = serde_json::from_str(&buf).unwrap_or_default();
