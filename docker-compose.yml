@@ -6,3 +6,4 @@ services:
     restart: always
     volumes:
       - ./.env:/app/.env:z
+      - ./conversations:/app/conversations:z

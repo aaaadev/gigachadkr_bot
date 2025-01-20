@@ -3,7 +3,7 @@ FROM oraclelinux:9-slim
 COPY . /opt/gigachad-bot
 
 RUN microdnf upgrade -y && \
-    microdnf install gcc git curl -y
+    microdnf install gcc git curl openssl-devel -y
 
 RUN mkdir -p /opt/rust /app
 
